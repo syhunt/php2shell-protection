@@ -253,6 +253,7 @@ A test result of ordinary POST **200 / PHP executed** and multipart POST **403 /
 - Each folder includes `target.php` and an example `.htaccess` rule with an 8 MiB Apache request-body limit.
 - `testblock.php`: standalone, browser-based multipart POST test (no cURL required).
 - `php-session-hardening.ini.example`: optional PHP configuration guidance; not automatically applied.
+- `nginx/php2shell.conf`: equivalent rule for Nginx.
 
 ## Requirements
 
@@ -301,6 +302,18 @@ RewriteRule ^ - [F,L]
 The revised header check also rejects non-standard comma-separated variants such as `Content-Type: multipart/form-data, boundary=example`, as well as standard semicolon-separated parameters. Commas are **not valid multipart parameter separators** under MIME syntax; rejecting this variant is defensive hardening, not evidence that PHP accepts it as multipart. Leading spaces and tabs are tolerated in the match. This is a header-based filter, not a complete HTTP request normalization or parser-discrepancy defense. Test any reverse proxy, alternate PHP routes, and edge cases in your own environment.
 
 The rule blocks **all** matching multipart POST requests, including forms with no attached file. It does not block ordinary URL-encoded POSTs. If the site needs uploads, do not deploy this rule globally without scoping exceptions and testing them.
+
+## Example Nginx
+
+Inside the `location` that passes requests to PHP:
+
+```nginx
+if ($http_content_type ~* "^\s*multipart/form-data([;,\s]|$)") {
+    return 403;
+}
+```
+
+Same match as the `.htaccess` rule (case, leading spaces, comma variant), for any method.
 
 ## Troubleshooting
 
