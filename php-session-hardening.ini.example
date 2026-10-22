@@ -1,0 +1,25 @@
+; php2shell-protection — OPTIONAL PHP session hardening example
+; Apply in the effective server-level PHP configuration (php.ini or PHP-FPM pool
+; admin settings). Do not assume Apache .htaccess can set these for CGI/FastCGI.
+; Verify values from the web SAPI and restart/reload PHP workers.
+;
+; The settings below are defense-in-depth, NOT fixes for the October 2026 CVEs.
+; Test application behavior and shared session storage before deployment.
+
+; Directly disables the upload-progress feature used by reported attack chains.
+; Available in PHP 5.4+; NOT available in PHP 5.2.
+session.upload_progress.enabled = Off
+
+; Keep one consistent serialization format across every process/application
+; sharing the same session storage. Do NOT change this blindly: existing
+; sessions may become unreadable; coordinate a migration/session reset.
+; 'php' is an example, not a universal safe fix.
+session.serialize_handler = php
+
+; General session hardening (not a proven mitigation for the research PoC).
+; Strict mode requires a session save handler that validates session IDs.
+session.use_strict_mode = 1
+session.cookie_httponly = 1
+
+; Enable ONLY if the application serves sessions exclusively over HTTPS.
+; session.cookie_secure = 1

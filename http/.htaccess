@@ -1,3 +1,8 @@
+# Emergency partial mitigation: no multipart uploads permitted
+# 8 MiB maximum HTTP request body (all content types)
+# Requires Apache permission for LimitRequestBody in .htaccess.
+LimitRequestBody 8388608
+
 # Reject multipart/form-data POST requests before PHP execution.
 # WARNING: This also blocks legitimate multipart forms and uploads.
 RewriteEngine On
