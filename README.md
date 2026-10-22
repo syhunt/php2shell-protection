@@ -48,6 +48,19 @@ A publicly released proof of concept reports command execution on **PHP 8.5.12**
 
 **Responsible-publication choice:** Although proof-of-concept material is now public, this README intentionally omits the researcher's identity, exploit repository links, payloads, commands, and attack paths. The aim is to provide actionable defensive context without facilitating reproduction.
 
+### Additional post-patch research: reported session and memory-safety findings (22 October 2026)
+
+Independent public research describes additional behavior on PHP releases containing the 21 October security fixes. **These are research claims and laboratory demonstrations, not new PHP security advisories.** Do not equate successful execution in a controlled configuration with unauthenticated RCE against a default deployment, or assume these findings reopen CVE-2026-109618 / CVE-2026-109619.
+
+- **Session-handling logic and session disruption:** The research reports command execution where applications or virtual hosts read and write shared session data using incompatible serialization formats, combined with application-defined object behavior. It also reports an upload-progress session-key handling issue and potential session-file disruption, including tests described as using default settings. The broader scope and default-installation impact remain **author-reported**, not independently established here. Review shared session storage, serializer consistency, application deserialization and session lifecycle assumptions. Disable session upload progress if not needed.
+- **SimpleXML garbage-collection double-free:** The underlying regression is separately tracked and maintainer-verified in [php/php-src #24488](https://github.com/php/php-src/issues/24488), with proposed fix [#24494](https://github.com/php/php-src/pull/24494). Additional research reports a reproducible remotely triggered process crash in a specially constructed PHP web endpoint. That supports a **demonstrated denial-of-service scenario in that test application**, not general remote exploitability or RCE on ordinary installations. The multipart filter and request-body limits here are **not validated controls** for this issue.
+- **`unserialize()` re-entry use-after-free:** A separate report describes an AddressSanitizer-detected memory-safety violation on PHP 8.5.12. Its effect on ordinary non-instrumented builds, remote reachability, and exploitability remain unconfirmed. Audit use of `unserialize()` on untrusted data and avoid unsafe object lifecycle callbacks; do not interpret the ASAN report as confirmed RCE.
+- **Patch-scope analysis:** The research also analyzes protections added in the October 21 fixes. This analysis is not itself a separate vulnerability report.
+
+**Defensive priorities:** Install official PHP fixes; disable `session.upload_progress.enabled` at the effective server level when unnecessary; keep session serialization consistent across applications and workers sharing storage; avoid deserializing untrusted data; fix application-level file inclusion and unsafe object behavior; and use multipart blocking and body-size limits only where compatible with legitimate traffic. These measures cover **selected prerequisites**, not every newly reported issue. This project has **not independently reproduced or validated** all the claims or tested its mitigations against all of them.
+
+**Publication policy:** This README intentionally does not reproduce payloads, link to exploit packages, or provide attack instructions. Research contributions are acknowledged in the Credits section without promoting exploit distribution.
+
 ### Temporary measures recommended by the PHP security team
 
 These are **risk reductions, not complete fixes**. Confirm settings in the active web SAPI and restart affected workers as appropriate.
@@ -301,6 +314,8 @@ This project is distributed under the [MIT License](LICENSE).
 
 **Felipe Daragon, Syhunt** — project author.
 
-**Andrew Dorman**, **Nicolas Krassas** and **hash_s3c** — info contributions on X.
+**Andrew Dorman** — early security-research contributions and subsequent technical analysis of post-patch session-handling gaps, the SimpleXML garbage-collection regression, and a reported `unserialize()` memory-safety issue. His research helped inform the expanded defensive guidance; independently unverified claims remain identified as such.
+
+**Nicolas Krassas** and **hash_s3c** — information contributions on X.
 
 **Neil Smith** — suggested the additional Content-Type matching hardening for nonstandard comma-separated multipart header variants.
