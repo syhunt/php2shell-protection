@@ -342,3 +342,5 @@ This project is distributed under the [MIT License](LICENSE).
 **Nicolas Krassas** and **hash_s3c** — information contributions on X.
 
 **Neil Smith** — suggested the additional Content-Type matching hardening for nonstandard comma-separated multipart header variants.
+
+**Anthony M** — for nginx/php2shell.conf.
