@@ -67,7 +67,17 @@ These are **risk reductions, not complete fixes**. Confirm settings in the activ
 
 **For CVE-2026-109618 (OOM corruption):**
 
-- Consider `memory_limit = -1` in a configuration applications cannot override. This avoids PHP's controllable memory-limit failure, but underlying allocation failures can still reach the vulnerable path. Removing PHP's memory limit also changes resource-exhaustion risk; use appropriate process/container controls.
+- Consider `memory_limit = -1` **temporarily** in an effective PHP configuration that applications cannot override. This removes the predictable PHP-enforced memory-limit failure involved in the reported OOM corruption path, **but it does not prevent real allocation failures or constitute a complete fix**. Removing PHP's limit can increase the risk of memory-exhaustion denial of service; use suitable worker isolation, container/cgroup memory controls, and monitoring. Do not use `RLIMIT_AS` or `RLIMIT_DATA` as substitutes, because allocation failures caused by those limits can still reach the vulnerable path.
+
+**Optional temporary PHP configuration (CVE-2026-109618 only):**
+
+```ini
+; TEMPORARY mitigation while arranging a patched PHP upgrade
+; Apply in the effective server-level PHP configuration.
+memory_limit = -1
+```
+
+**Operational caution:** This is **not a recommended default for all sites** and is **not a mitigation for CVE-2026-109619**. It can allow a single request to consume excessive memory, potentially destabilizing a shared host. Verify the effective setting for the web-facing SAPI and restart workers as needed. Prefer upgrading PHP; do not add this directive to the separate session-hardening example by default. See the [official CVE-2026-109618 advisory](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w) and [Daubois's analysis](https://daubois.dev/blog/cve-2026-109618-php2shell-rumors/) for context.
 - Reduce `post_max_size`: PHP suggests **8M** where uploads are unnecessary or **32M** where uploads are required, and keep `upload_max_filesize` below `post_max_size`. Evaluate application needs before changing limits.
 - Enforce request size and complexity limits at the web server or proxy, including decoded size, field count, multipart part count, header count and nesting depth, even when `Content-Length` is absent or unusable.
 - Prefer container/cgroup boundaries that terminate only affected workers; PHP explicitly advises against substituting `RLIMIT_AS` or `RLIMIT_DATA` because those limits can trigger vulnerable allocation failures.
