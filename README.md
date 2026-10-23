@@ -36,13 +36,38 @@ A proposed fix is tracked in **[php/php-src pull request #24494](https://github.
 
 This repository does not include or link to private exploit material. The public PHP bug tracker and proposed fix are linked for transparent, verifiable context.
 
+### Official PHP advisory: CVE-2026-115560 — session upload progress (23 October 2026)
+
+**Status: officially acknowledged by the PHP project; fix pending in the next regular bugfix release as of 23 October 2026.** This is a separate, configuration-dependent RCE risk and **does not establish a bypass** of the 21 October fixes for CVE-2026-109618 and CVE-2026-109619.
+
+The PHP security team identifies a narrow combination of conditions:
+
+- `session.serialize_handler` is configured as `php_binary` or `php_serialize`.
+- Application code changes it to `php` using `ini_set()` **before** `session_start()`.
+- `session.upload_progress.enabled` remains enabled.
+
+PHP describes this setup as unlikely in normal deployments. It recommends setting **`session.upload_progress.enabled = 0`** until the next regular bugfix release, especially where the application uses this unusual serializer switch. If upload progress was already disabled in response to the 21 October advisory, PHP says no further action is needed for this specific vector.
+
+```ini
+; Temporary defense for the CVE-2026-115560 session upload-progress vector
+session.upload_progress.enabled = 0
+```
+
+**Apply this in the effective server-level PHP configuration before request parsing and restart affected workers.** Do not rely on an application-level `ini_set()` call to disable upload progress: upload-progress handling can run before application code. Confirm the setting for the actual web-facing PHP SAPI. Review applications that change session serializers at runtime, and ensure all components sharing session storage use compatible serialization formats.
+
+**Scope:** Disabling upload progress targets this confirmed vector; it is not a complete mitigation for the original October 21 CVEs or for unrelated application vulnerabilities. Keep the October 21 PHP patches installed. This project's Apache multipart filter may reduce exposure where multipart requests are not needed, but has not been independently validated as a complete mitigation for CVE-2026-115560.
+
+**Official source:** [PHP security team's 23 October 2026 informational advisory](https://www.php.net/archive/2026.php#2026-10-23-1) (also listed at [PHP 2026 news archive](https://www.php.net/archive/2026.php)). PHP states that a full advisory for **CVE-2026-115560** will accompany the next regular release.
+
+**Relationship to earlier public research:** The 22 October laboratory demonstration below describes a related session-handling scenario on a patched PHP release. The PHP advisory now confirms a vulnerability involving the serializer switch and upload progress, but does **not** independently validate every claim, exploit prerequisite, or application-specific behavior described in that demonstration. We continue to omit exploit repositories, payloads and reproduction instructions.
+
 ### Public research update: configuration-dependent RCE demonstration on PHP 8.5.12 (22 October 2026)
 
 A publicly released proof of concept reports command execution on **PHP 8.5.12** using an **Apache 2.4 / `mod_php` laboratory configuration**. The reported mechanism is a **session-handling logic and application-object interaction**, not the memory-corruption mechanisms addressed by **CVE-2026-109618** and **CVE-2026-109619**. A demonstration showing command output in a controlled environment is noteworthy, but does **not** establish unauthenticated RCE against a default PHP installation.
 
 **Important prerequisites disclosed by the research:** The newer demonstration depends on **different session serialization formats being used when session data is written and read**, a suitable **application-defined object with security-sensitive cleanup behavior**, and **session upload-progress processing**. The published laboratory setup uses non-default upload-progress cleanup behavior. The research also discusses a **separate, older session-poisoning chain requiring an application-level local file inclusion vulnerability**. These should not be conflated with each other or with the two October 21 CVEs.
 
-**What remains unconfirmed:** Independent validation by PHP maintainers, general exploitability on ordinary deployments, applicability to CGI/FastCGI or PHP-FPM, and whether the newer demonstration merits a separate PHP-core CVE. The published report is not proof that the October 21 security fixes were bypassed. It also should not be conflated with the separately tracked SimpleXML garbage-collection regression.
+**What remains unconfirmed about the specific public demonstration:** Whether its complete exploit chain is identical to the newly acknowledged CVE-2026-115560, general exploitability on ordinary deployments, and applicability of its application-specific behavior to other SAPIs. PHP has separately acknowledged the configuration-dependent session upload-progress RCE vector and assigned CVE-2026-115560, as described above. The published report is not proof that the October 21 security fixes were bypassed. It also should not be conflated with the separately tracked SimpleXML garbage-collection regression.
 
 **Defensive implications:** Where uploads are unnecessary, the Apache multipart-blocking rule in this project may interrupt the upload-progress stage. Disabling `session.upload_progress.enabled` at the PHP configuration level is a more targeted defense against chains that require that feature. Review applications for inconsistent session serialization settings, unsafe deserialization behavior, risky destructor side effects, and local file inclusion. **These project mitigations have not been independently validated against the newly published demonstration**, and request-body size limits alone are not a proven defense against it.
 
@@ -50,7 +75,7 @@ A publicly released proof of concept reports command execution on **PHP 8.5.12**
 
 ### Additional post-patch research: reported session and memory-safety findings (22 October 2026)
 
-Independent public research describes additional behavior on PHP releases containing the 21 October security fixes. **These are research claims and laboratory demonstrations, not new PHP security advisories.** Do not equate successful execution in a controlled configuration with unauthenticated RCE against a default deployment, or assume these findings reopen CVE-2026-109618 / CVE-2026-109619.
+Independent public research describes additional behavior on PHP releases containing the 21 October security fixes. **These reports include research claims and laboratory demonstrations. **One related session upload-progress RCE vector is now officially acknowledged as CVE-2026-115560** (see the 23 October section above); other reported findings remain separately assessed and should not be treated as confirmed advisories.** Do not equate successful execution in a controlled configuration with unauthenticated RCE against a default deployment, or assume these findings reopen CVE-2026-109618 / CVE-2026-109619.
 
 - **Session-handling logic and session disruption:** The research reports command execution where applications or virtual hosts read and write shared session data using incompatible serialization formats, combined with application-defined object behavior. It also reports an upload-progress session-key handling issue and potential session-file disruption, including tests described as using default settings. The broader scope and default-installation impact remain **author-reported**, not independently established here. Review shared session storage, serializer consistency, application deserialization and session lifecycle assumptions. Disable session upload progress if not needed.
 - **SimpleXML garbage-collection double-free:** The underlying regression is separately tracked and maintainer-verified in [php/php-src #24488](https://github.com/php/php-src/issues/24488), with proposed fix [#24494](https://github.com/php/php-src/pull/24494). Additional research reports a reproducible remotely triggered process crash in a specially constructed PHP web endpoint. That supports a **demonstrated denial-of-service scenario in that test application**, not general remote exploitability or RCE on ordinary installations. The multipart filter and request-body limits here are **not validated controls** for this issue.
@@ -253,7 +278,6 @@ A test result of ordinary POST **200 / PHP executed** and multipart POST **403 /
 - Each folder includes `target.php` and an example `.htaccess` rule with an 8 MiB Apache request-body limit.
 - `testblock.php`: standalone, browser-based multipart POST test (no cURL required).
 - `php-session-hardening.ini.example`: optional PHP configuration guidance; not automatically applied.
-- `nginx/php2shell.conf`: equivalent rule for Nginx.
 
 ## Requirements
 
@@ -303,18 +327,6 @@ The revised header check also rejects non-standard comma-separated variants such
 
 The rule blocks **all** matching multipart POST requests, including forms with no attached file. It does not block ordinary URL-encoded POSTs. If the site needs uploads, do not deploy this rule globally without scoping exceptions and testing them.
 
-## Example Nginx
-
-Inside the `location` that passes requests to PHP:
-
-```nginx
-if ($http_content_type ~* "^\s*multipart/form-data([;,\s]|$)") {
-    return 403;
-}
-```
-
-Same match as the `.htaccess` rule (case, leading spaces, comma variant), for any method.
-
 ## Troubleshooting
 
 - **Both tests return 301/302:** A redirect is occurring; choose the matching scheme or adjust server routing.
@@ -342,5 +354,3 @@ This project is distributed under the [MIT License](LICENSE).
 **Nicolas Krassas** and **hash_s3c** — information contributions on X.
 
 **Neil Smith** — suggested the additional Content-Type matching hardening for nonstandard comma-separated multipart header variants.
-
-**Anthony M** — for nginx/php2shell.conf.
