@@ -36,6 +36,18 @@ A proposed fix is tracked in **[php/php-src pull request #24494](https://github.
 
 This repository does not include or link to private exploit material. The public PHP bug tracker and proposed fix are linked for transparent, verifiable context.
 
+### Observed exploitation in the wild — 24 October 2026
+
+Researchers from the [0x4D31 honeypot-data project](https://github.com/0x4D31/honeypot-data/tree/main/reports/php2shell) reported **35 execution-stage HTTP POST requests correlated with 35 Apache-parent `/bin/sh` process starts** across three instrumented PHP honeypots on 24 October. Their analysis correlates target-side packet captures, Apache worker identities, PHP errors, and Tetragon process events; some commands subsequently launched `id`, PHP CLI, or `curl`. This is stronger evidence of successful command execution than HTTP status codes, out-of-memory errors, or worker crashes alone.
+
+**Scope matters:** The affected honeypots ran **PHP 8.4.26** under Apache `mod_php`, predating the patched **PHP 8.4.27** release. The observed multipart POST chain involved memory pressure, disclosure-sized session cookies, and target-adjusted execution requests, consistent with **CVE-2026-109618**. The findings **do not demonstrate exploitation of patched PHP versions**, a bypass of the 21 October security fixes, or exploitation of CVE-2026-109619 or CVE-2026-115560. Two source-address clusters were observed; they cannot be reliably attributed to distinct operators.
+
+An [earlier capture report](https://github.com/0x4D31/honeypot-data/blob/main/reports/php2shell/2026-10-22-to-24-initial-attempts.md) covering 22–24 October documented **30 pre-script out-of-memory errors and 11 Apache worker crashes**, but **no confirmed RCE during that earlier window**. The later findings should not be retroactively attributed to that period.
+
+All 35 reported successful execution-stage requests used **multipart POSTs**, the request class this toolkit is designed to reject where multipart forms are unnecessary. However, the honeypot study **did not test or validate this toolkit's Apache rules**. Blocking multipart POSTs remains a partial, application-dependent defense-in-depth measure, **not a substitute for upgrading PHP**.
+
+**Research reports:** [Packet-to-process RCE evidence (24 October)](https://github.com/0x4D31/honeypot-data/blob/main/reports/php2shell/2026-10-24-confirmed-rce.md) · [Initial exploitation attempts (22–24 October)](https://github.com/0x4D31/honeypot-data/blob/main/reports/php2shell/2026-10-22-to-24-initial-attempts.md).
+
 ### Official PHP advisory: CVE-2026-115560 — session upload progress (23 October 2026)
 
 **Status: officially acknowledged by the PHP project; fix pending in the next regular bugfix release as of 23 October 2026.** This is a separate, configuration-dependent RCE risk and **does not establish a bypass** of the 21 October fixes for CVE-2026-109618 and CVE-2026-109619.
